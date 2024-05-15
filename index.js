@@ -1,5 +1,6 @@
 require("dotenv").config();
 const cors = require("cors");
+const errorHandler = require("./middleware/error-handler");
 const express = require("express");
 const app = express();
 
@@ -16,33 +17,57 @@ app.get('/api/notes', (req, res) => {
         });
 });
 
-app.get('/api/notes/:id', (req, res) => {
-    const id = +req.params.id;
-    const note = notes.find(note => note.id === id);
-    if (note) {
-        return res.status(200).json(note);
-    }
-    res.statusMessage = "No such resource found, dumbass";
-    res.status(404).json({ msg: res.statusMessage });
+app.get('/api/notes/:id', (req, res, next) => {
+    Note.findById(req.params.id)
+        .then(note => {
+            if (note) {
+                res.json(note);
+            } else {
+                res.status(404).end();
+            }
+        })
+        .catch(error => next(error));
+});
+
+app.delete('/api/notes/:id', (req, res, next) => {
+    Note.findByIdAndDelete(req.params.id)
+        .then(result => res.status(204).end())
+        .catch(error => next(error));
 })
 
-app.delete('/api/notes/:id', (req, res) => {
-    const id = +req.params.id;
-    notes = notes.filter(note => note.id !== id);
-    res.status(204).end();
-})
-
-app.post('/api/notes', (req, res) => {
-    if (!req.body) {
+app.post('/api/notes', (req, res, next) => {
+    if (req.body.content === undefined) {
         return res.status(400).json({ msg: "Content is missing" });
     }
 
-    const note = req.body;
-    note.id = notes.length + 1;
-    notes.push(note);
+    const note = new Note({
+        content: req.body.content,
+        important: req.body.important || false
+    });
 
-    res.status(200).json(note);
+    note.save()
+        .then(note => res.json(note))
+        .catch(err => next(err));
 })
+
+app.put('/api/notes/:id', (req, res, next) => {
+    const note = {
+        content: req.body.content,
+        important: req.body.important 
+    };
+
+    Note.findByIdAndUpdate(req.params.id, note, { new: true, runValidators: true, context: "query" })
+        .then(note => res.json(note))
+        .catch(error => next(error));
+});
+
+const unknownEndpoint = (req, res) => {
+    res.status(404).json({ msg: "Unknown endpoint"} );
+}
+
+app.use(unknownEndpoint);
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {

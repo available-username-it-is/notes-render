@@ -12,7 +12,11 @@ mongoose.connect(process.env.MONGO_URI)
     });
 
 const noteSchema = new mongoose.Schema({
-    content: String,
+    content: {
+        type: String,
+        minLength: [5, "Note must be at least 5 characters long"],
+        required: [true, "Please, enter the note text"]
+    },
     important: Boolean
 });
 
